@@ -169,21 +169,14 @@ class NewInterface implements ServerInstance, AdvancedSourceInterface{
 	}
 
 	public function setName($name){
-		//$info = $this->server->getQueryInformation();
-
-		if($this->server->isDServerEnabled() and $this->server->dserverConfig["motdMaxPlayers"] > 0) $pc = $this->server->dserverConfig["motdMaxPlayers"];
-		elseif($this->server->isDServerEnabled() and $this->server->dserverConfig["motdAllPlayers"]) $pc = $this->server->getDServerMaxPlayers();
-		else $pc = $this->server->getMaxPlayers();
-
-		if($this->server->isDServerEnabled() and $this->server->dserverConfig["motdPlayers"]) $poc = $this->server->getDServerOnlinePlayers();
-		else $poc = count($this->server->getOnlinePlayers());
+		$info = $this->server->getQueryInformation();
 
 		$this->interface->sendOption("name",
 			"MCPE;" . addcslashes($name, ";") . ";" .
 			BetaTester::CURRENT_PROTOCOL . ";" .
-			"0.14.0" . ";" .
-			$poc . ";" .
-			$pc
+			BetaTester::CURRENT_MINECRAFT_VERSION_NETWORK . ";" .
+			$info->getPlayerCount() . ";" .
+			$info->getMaxPlayerCount()
 		);
 	}
 

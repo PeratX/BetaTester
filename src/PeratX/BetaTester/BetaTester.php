@@ -12,6 +12,8 @@ class BetaTester extends PluginBase{
 	const CURRENT_PROTOCOL = 41;
 	const TARGET_PROTOCOL = 38;
 
+	const CURRENT_MINECRAFT_VERSION_NETWORK = "0.14.0";
+
 	public function onEnable(){
 		$this->saveDefaultConfig();
 
