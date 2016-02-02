@@ -23,6 +23,7 @@ namespace PeratX\BetaTester;
 
 use pocketmine\network\AdvancedSourceInterface;
 use pocketmine\event\player\PlayerCreationEvent;
+use pocketmine\network\protocol\BatchPacket;
 use pocketmine\network\protocol\DataPacket;
 use pocketmine\network\protocol\Info as ProtocolInfo;
 use pocketmine\Player;
@@ -42,6 +43,8 @@ class NewInterface implements ServerInstance, AdvancedSourceInterface{
 
 	/** @var Network */
 	private $network;
+	/** @var Network */
+	private $processNetwork;
 
 	/** @var RakLibServer */
 	private $rakLib;
@@ -69,6 +72,10 @@ class NewInterface implements ServerInstance, AdvancedSourceInterface{
 
 	public function setNetwork(Network $network){
 		$this->network = $network;
+	}
+
+	public function setProcessNetwork(Network $network){
+		$this->processNetwork = $network;
 	}
 
 	public function process(){
@@ -134,7 +141,11 @@ class NewInterface implements ServerInstance, AdvancedSourceInterface{
 					$pk = $this->getPacket($packet->buffer);
 					if($pk !== null){
 						$pk->decode();
-						if($pk::NETWORK_ID == ProtocolInfo::LOGIN_PACKET) $pk->protocol1 = 38;
+						if($pk::NETWORK_ID == ProtocolInfo::BATCH_PACKET) {
+							/** @var BatchPacket $pk */
+							$this->processNetwork->processBatch($pk, $this->players[$identifier]);
+							return;
+						}
 						$this->players[$identifier]->handleDataPacket($pk);
 					}
 				}
@@ -201,7 +212,7 @@ class NewInterface implements ServerInstance, AdvancedSourceInterface{
 				if(!isset($packet->__encapsulatedPacket)){
 					$packet->__encapsulatedPacket = new CachedEncapsulatedPacket;
 					$packet->__encapsulatedPacket->identifierACK = null;
-					$packet->__encapsulatedPacket->buffer = chr(0x8e) . $packet->buffer;
+					$packet->__encapsulatedPacket->buffer = $packet->buffer;
 					$packet->__encapsulatedPacket->reliability = 3;
 					$packet->__encapsulatedPacket->orderChannel = 0;
 				}
@@ -217,7 +228,7 @@ class NewInterface implements ServerInstance, AdvancedSourceInterface{
 
 			if($pk === null){
 				$pk = new EncapsulatedPacket();
-				$pk->buffer = chr(0x8e) . $packet->buffer;
+				$pk->buffer = $packet->buffer;
 				$packet->reliability = 3;
 				$packet->orderChannel = 0;
 
@@ -235,12 +246,12 @@ class NewInterface implements ServerInstance, AdvancedSourceInterface{
 	}
 
 	private function getPacket($buffer){
-		$pid = ord($buffer{1});
+		$pid = ord($buffer{0});
 
 		if(($data = $this->network->getPacket($pid)) === null){
 			return null;
 		}
-		$data->setBuffer($buffer, 2);
+		$data->setBuffer($buffer, 1);
 
 		return $data;
 	}
