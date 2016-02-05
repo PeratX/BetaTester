@@ -10,7 +10,7 @@ use pocketmine\plugin\PluginBase;
 class BetaTester extends PluginBase{
 
 	const CURRENT_PROTOCOL = 43;
-	const TARGET_PROTOCOL = 38;
+	const TARGET_PROTOCOL = 39;
 
 	const CURRENT_MINECRAFT_VERSION_NETWORK = "0.14.0";
 
