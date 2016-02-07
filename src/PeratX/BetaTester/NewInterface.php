@@ -23,8 +23,11 @@ namespace PeratX\BetaTester;
 
 use pocketmine\network\AdvancedSourceInterface;
 use pocketmine\event\player\PlayerCreationEvent;
+use pocketmine\network\protocol\BatchPacket;
 use pocketmine\network\protocol\DataPacket;
 use pocketmine\network\protocol\Info as ProtocolInfo;
+use pocketmine\utils\Binary;
+use pocketmine\utils\MainLogger;
 use pocketmine\Player;
 use pocketmine\Server;
 use raklib\protocol\EncapsulatedPacket;
@@ -115,6 +118,46 @@ class NewInterface implements ServerInstance, AdvancedSourceInterface{
 		$this->interface->emergencyShutdown();
 	}
 
+	public function processBatch(BatchPacket $packet, Player $p) {
+		$str = zlib_decode($packet->payload, 1024 * 1024 * 64); //Max 64MB
+		$len = strlen($str);
+		$offset = 0;
+		try {
+			while ($offset < $len) {
+				$pkLen = Binary::readInt(substr($str, $offset, 4));
+				$offset += 4;
+
+				$buf = substr($str, $offset, $pkLen);
+				$offset += $pkLen;
+
+				if (($pk = $this->getPacket(ord($buf{1}))) !== null) {
+					if ($pk::NETWORK_ID === ProtocolInfo::BATCH_PACKET) {
+						throw new \InvalidStateException("Invalid BatchPacket inside BatchPacket");
+					}
+
+					$pk->setBuffer($buf, 2);
+
+					$pk->decode();
+					if($pk::NETWORK_ID == ProtocolInfo::LOGIN_PACKET) $pk->protocol1 = BetaTester::TARGET_PROTOCOL;
+					$p->handleDataPacket($pk);
+
+					if ($pk->getOffset() <= 0) {
+						return;
+					}
+				}
+			}
+		} catch (\Throwable $e) {
+			if (\pocketmine\DEBUG > 1) {
+				$logger = $this->server->getLogger();
+				if ($logger instanceof MainLogger) {
+					$logger->debug("BatchPacket " . " 0x" . bin2hex($packet->payload));
+					$logger->logException($e);
+				}
+			}
+		}
+	}
+
+
 	public function openSession($identifier, $address, $port, $clientID){
 		$ev = new PlayerCreationEvent($this, Player::class, Player::class, null, $address, $port);
 		$this->server->getPluginManager()->callEvent($ev);
@@ -134,7 +177,11 @@ class NewInterface implements ServerInstance, AdvancedSourceInterface{
 					$pk = $this->getPacket($packet->buffer);
 					if($pk !== null){
 						$pk->decode();
-						if($pk::NETWORK_ID == ProtocolInfo::LOGIN_PACKET) $pk->protocol1 = 38;
+						if($pk instanceof BatchPacket) {
+							$this->processBatch($pk, $this->players[$identifier]);
+							return;
+						}
+						if($pk::NETWORK_ID == ProtocolInfo::LOGIN_PACKET) $pk->protocol1 = BetaTester::TARGET_PROTOCOL;
 						$this->players[$identifier]->handleDataPacket($pk);
 					}
 				}

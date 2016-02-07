@@ -30,7 +30,6 @@ class BetaTester extends PluginBase{
 
 		$this->getLogger()->info("Starting Minecraft PE server ".$this->getDescription()->getVersion()." on port $port");
 		$interface = new NewInterface($this->getServer(), $port);
-		$interface->setNetwork(new NewNetwork($this->getServer()));
 		$this->getServer()->getNetwork()->registerInterface($interface);
 	}
 }
