@@ -1,5 +1,5 @@
 name: BetaTester
-version: "0.14.0 alpha build 4"
+version: "0.14.0 alpha build 6"
 main: PeratX\BetaTester\BetaTester
 load: STARTUP
 author: PeratX
