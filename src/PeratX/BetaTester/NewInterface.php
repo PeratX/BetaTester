@@ -21,6 +21,7 @@
 
 namespace PeratX\BetaTester;
 
+use PeratX\BetaTester\protocol\LoginPacket;
 use pocketmine\network\AdvancedSourceInterface;
 use pocketmine\event\player\PlayerCreationEvent;
 use pocketmine\network\protocol\BatchPacket;
@@ -35,6 +36,8 @@ use raklib\server\ServerHandler;
 use raklib\server\ServerInstance;
 use pocketmine\network\Network;
 use pocketmine\network\CachedEncapsulatedPacket;
+use pocketmine\utils\Binary;
+use pocketmine\utils\MainLogger;
 
 class NewInterface implements ServerInstance, AdvancedSourceInterface{
 
@@ -43,8 +46,6 @@ class NewInterface implements ServerInstance, AdvancedSourceInterface{
 
 	/** @var Network */
 	private $network;
-	/** @var Network */
-	private $processNetwork;
 
 	/** @var RakLibServer */
 	private $rakLib;
@@ -72,10 +73,6 @@ class NewInterface implements ServerInstance, AdvancedSourceInterface{
 
 	public function setNetwork(Network $network){
 		$this->network = $network;
-	}
-
-	public function setProcessNetwork(Network $network){
-		$this->processNetwork = $network;
 	}
 
 	public function process(){
@@ -134,6 +131,47 @@ class NewInterface implements ServerInstance, AdvancedSourceInterface{
 		$this->server->addPlayer($identifier, $player);
 	}
 
+	public function processBatch(BatchPacket $packet, Player $p) {
+		$str = zlib_decode($packet->payload, 1024 * 1024 * 64); //Max 64MB
+		$len = strlen($str);
+		$offset = 0;
+		try {
+			while ($offset < $len) {
+				$pkLen = Binary::readInt(substr($str, $offset, 4));
+				$offset += 4;
+
+				$buf = substr($str, $offset, $pkLen);
+				$offset += $pkLen;
+
+				if (($pk = $this->network->getPacket(ord($buf{0}))) !== null) {
+					if ($pk::NETWORK_ID === ProtocolInfo::BATCH_PACKET) {
+						throw new \InvalidStateException("Invalid BatchPacket inside BatchPacket");
+					}
+
+					if($pk::NETWORK_ID == ProtocolInfo::LOGIN_PACKET) $pk = new LoginPacket();
+
+					$pk->setBuffer($buf, 1);
+
+					$pk->decode();
+					if($pk::NETWORK_ID == ProtocolInfo::LOGIN_PACKET) $pk->protocol1 = BetaTester::TARGET_PROTOCOL;
+					$p->handleDataPacket($pk);
+
+					if ($pk->getOffset() <= 0) {
+						return;
+					}
+				}
+			}
+		} catch (\Throwable $e) {
+			if (\pocketmine\DEBUG > 1) {
+				$logger = $this->server->getLogger();
+				if ($logger instanceof MainLogger) {
+					$logger->debug("BatchPacket " . " 0x" . bin2hex($packet->payload));
+					$logger->logException($e);
+				}
+			}
+		}
+	}
+
 	public function handleEncapsulated($identifier, EncapsulatedPacket $packet, $flags){
 		if(isset($this->players[$identifier])){
 			try{
@@ -141,9 +179,9 @@ class NewInterface implements ServerInstance, AdvancedSourceInterface{
 					$pk = $this->getPacket($packet->buffer);
 					if($pk !== null){
 						$pk->decode();
-						if($pk::NETWORK_ID == ProtocolInfo::BATCH_PACKET) {
+						if($pk instanceof BatchPacket) {
 							/** @var BatchPacket $pk */
-							$this->processNetwork->processBatch($pk, $this->players[$identifier]);
+							$this->processBatch($pk, $this->players[$identifier]);
 							return;
 						}
 						$this->players[$identifier]->handleDataPacket($pk);

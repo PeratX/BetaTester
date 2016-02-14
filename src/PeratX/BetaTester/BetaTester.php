@@ -10,7 +10,7 @@ use pocketmine\plugin\PluginBase;
 class BetaTester extends PluginBase{
 
 	const CURRENT_PROTOCOL = 38;
-	const TARGET_PROTOCOL = 42;
+	const TARGET_PROTOCOL = 44;
 
 	const CURRENT_MINECRAFT_VERSION_NETWORK = "0.13.1";
 
@@ -31,6 +31,5 @@ class BetaTester extends PluginBase{
 		$this->getLogger()->info("Starting Minecraft PE server ".$this->getDescription()->getVersion()." on port $port");
 		$interface = new NewInterface($this->getServer(), $port);
 		$this->getServer()->getNetwork()->registerInterface($interface);
-		$interface->setProcessNetwork(new NewNetwork($this->getServer()));
 	}
 }
